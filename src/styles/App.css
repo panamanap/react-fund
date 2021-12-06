@@ -23,6 +23,9 @@
   align-items: center;
 }
 
+.post__btns {
+  display: flex;
+}
 .post-enter {
   opacity: 0;
 }

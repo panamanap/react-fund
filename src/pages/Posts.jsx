@@ -1,8 +1,8 @@
 import React from 'react';
 
-import { usePost } from '../component/hooks/usePost';
-import { usePagination } from '../component/hooks/usePagination';
-import { useFetching } from '../component/hooks/useFetching';
+import { usePost } from '../hooks/usePost';
+import { usePagination } from '../hooks/usePagination';
+import { useFetching } from '../hooks/useFetching';
 
 import { PostService } from '../API/PostService';
 import { getPageCount } from '../utils/getPageCount';
@@ -14,6 +14,8 @@ import Loader from '../component/UI/loader/Loader';
 import PostForm from '../component/PostForm';
 import PostFilter from '../component/PostFilter';
 import PostList from '../component/PostList';
+import { useObserver } from '../hooks/useObserver';
+import MySelect from '../component/UI/select/MySelect';
 
 function Posts() {
     const [posts, setPosts] = React.useState([]);
@@ -24,14 +26,18 @@ function Posts() {
     const [limit, setLimit] = React.useState(10);
     const [page, setPage] = React.useState(1);
     const getPagesArray = usePagination(totalPages);
+    const lastElement = React.useRef();
+
     const [fetchPosts, isPostLoading, postError] = useFetching(async () => {
         const response = await PostService.getAll(limit, page);
-        setPosts(response.data);
+        setPosts([...posts, ...response.data]);
         const totalCount = response.headers['x-total-count'];
         setTotalPages(getPageCount(totalCount, limit));
     });
 
-    console.log();
+    useObserver(lastElement, page < totalPages, isPostLoading, () => {
+        setPage(page + 1);
+    });
 
     const createPost = (newPost) => {
         setPosts([...posts, newPost]);
@@ -40,7 +46,7 @@ function Posts() {
 
     React.useEffect(() => {
         fetchPosts();
-    }, [page]);
+    }, [page, limit]);
 
     const removePost = (post) => {
         setPosts(posts.filter((p) => p.id !== post.id));
@@ -61,6 +67,7 @@ function Posts() {
             <MyModal visible={modal} setVisible={setModal}>
                 <PostForm create={createPost} />
             </MyModal>
+
             <hr style={{ margin: '15px' }} />
             <PostFilter filter={filter} setFilter={setFilter} />
             {postError && (
@@ -68,7 +75,27 @@ function Posts() {
                     Произошла ошибка ${postError}
                 </h1>
             )}
-            {isPostLoading ? (
+            <MySelect
+                value={limit}
+                onChange={(value) => setLimit(value)}
+                defaultValue="Кол-во элемеентов на странице"
+                options={[
+                    { value: 5, name: '5' },
+                    { value: 10, name: '10' },
+                    { value: 25, name: '25' },
+                    { value: -1, name: 'Показать всё' },
+                ]}
+            ></MySelect>
+            <PostList
+                title="Посты про JS"
+                posts={sortedAndSearchedPosts}
+                remove={removePost}
+            />
+            <div
+                ref={lastElement}
+                style={{ height: '20px', background: 'red' }}
+            ></div>
+            {isPostLoading && (
                 <div
                     style={{
                         display: 'flex',
@@ -78,13 +105,8 @@ function Posts() {
                 >
                     <Loader />
                 </div>
-            ) : (
-                <PostList
-                    title="Посты про JS"
-                    posts={sortedAndSearchedPosts}
-                    remove={removePost}
-                />
             )}
+
             <div className="page__wrapper">
                 {getPagesArray.map((p) => (
                     <span
